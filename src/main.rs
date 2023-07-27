@@ -19,6 +19,7 @@ fn main() {
     }
 
     
+    
     // Game starts
     
     // Creating board variable
@@ -62,13 +63,19 @@ fn main() {
             break;
         }
 
+        // clear_console();
         // Player 2's turn starts
         let best_col: usize = ai_opponent::get_best_move(&mut playing_board);
 
-        //type_writer("Thinking...", 1.5, true, CustomColor::new(208,208,23));
-        //wait_for_seconds(2.0);
+        // type_writer("Thinking...", 1.5, true, CustomColor::new(208,208,23));
+        // wait_for_seconds(2.0);
 
         board::drop_at_column_num(&mut playing_board, best_col, board::YELLOW_PIECE);
+        board::display_board(&playing_board);
+        
+        if check_if_winner(&playing_board) {
+            break;
+        }
     }
 }
 
