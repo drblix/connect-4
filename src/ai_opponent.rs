@@ -1,87 +1,86 @@
+use crate::board::evaluate_board;
+
 #[path ="board.rs"]
 mod board;
 
-/**
- Gets the best column for the AI to drop a piece into (depending on difficulty)
- * `playing_board` the board being used to play the game
- */
-pub fn get_best_move(playing_board: &mut [char; board::BOARD_SIZE]) -> usize {
-    let mut best_eval: i8 = i8::MIN;
-    let mut best_move: usize = 100;
+pub const NO_COL: usize = 8;
 
-    for col in 0..board::BOARD_WIDTH {
-        if board::is_column_open_num(playing_board, col) {
-            // perform move
-            let temp_move: (usize, usize) = board::drop_at_column_num(playing_board, col, board::YELLOW_PIECE);
+// TODO:
+// alpha-beta pruning optimization
+pub fn minimax(playing_board: &mut [char; board::BOARD_SIZE], depth: u16, is_max: bool) -> (usize, i16) {
+    let open_columns: Vec<usize> = board::get_open_columns(playing_board);
 
-            // evaluate move
-            let move_eval: i8 = minimax(playing_board, 3, false, i8::MIN, i8::MAX);
+    // .0 = player won
+    // .1 = AI won
+    // .2 = no more valid moves
+    let is_terminal: (bool, bool, bool) = is_terminal_node(playing_board);
 
-            // undo previous move
-            board::set_square_at(playing_board, temp_move.0, temp_move.1, board::EMPTY);
-            
-            // println!("Move: {}, Evaluation: {}", col, move_eval);
-            // check if this move is best
-            if move_eval > best_eval {
-                best_eval = move_eval;
-                best_move = col;
-            }
+    if (is_terminal.0 || is_terminal.1 || is_terminal.2) || depth == 0 {
+        if is_terminal.0 {
+            return (NO_COL, i16::MIN);
+        }
+        else if is_terminal.1 {
+            return (NO_COL, i16::MAX);
+        }
+        else if is_terminal.2 {
+            return (NO_COL, 0);
+        }
+        // Reached end of depth
+        else {
+            return (NO_COL, evaluate_board(playing_board, board::YELLOW_PIECE));
         }
     }
 
-    // println!("Best move: {}", best_move);
-    return best_move;
+    // Maximizing the AI
+    if is_max {
+        let mut eval: i16 = i16::MIN;
+        let mut column: usize = 0;
+
+        for col in open_columns {
+            // Make initial move
+            let temp_move: (usize, usize) = board::drop_at_column(playing_board, col, board::YELLOW_PIECE);
+
+            // Evaluate said move
+            let new_eval: (usize, i16) = minimax(playing_board, depth - 1, false);
+
+            // Undo previous move
+            board::set_square_at(playing_board, temp_move.0, temp_move.1, board::EMPTY);
+
+            if new_eval.1 > eval {
+                eval = new_eval.1;
+                column = col;
+            }
+        }
+
+        return (column, eval);
+    }
+    // Minimizing the player
+    else {
+        let mut eval: i16 = i16::MAX;
+        let mut column: usize = 0;
+
+        for col in open_columns {
+            // Make initial move
+            let temp_move: (usize, usize) = board::drop_at_column(playing_board, col, board::RED_PIECE);
+
+            // Evaluate said move
+            let new_eval: (usize, i16) = minimax(playing_board, depth - 1, true);
+
+            // Undo previous move
+            board::set_square_at(playing_board, temp_move.0, temp_move.1, board::EMPTY);
+
+            if new_eval.1 < eval {
+                eval = new_eval.1;
+                column = col;
+            }
+        }
+
+        return (column, eval);
+    }
 }
 
-fn minimax(playing_board: &mut [char; board::BOARD_SIZE], depth: u32, is_max: bool, mut alpha: i8, mut beta: i8) -> i8 {
-    let evaluation: i8 = board::evaluate_board(playing_board);
-
-    if evaluation == board::PLAYER_1_WIN || evaluation == board::PLAYER_2_WIN || depth == 0 { return evaluation; }
-    
-    if !board::are_moves_left(playing_board) { return board::STALEMATE; }
-
-    if is_max {
-        let mut best_eval: i8 = i8::MIN;
-
-        for col in 0..board::BOARD_WIDTH {
-            if board::is_column_open_num(playing_board, col) {
-                // perform move
-                let temp_move: (usize, usize) = board::drop_at_column_num(playing_board, col, board::YELLOW_PIECE);
-                
-                // evaluate the move
-                best_eval = best_eval.max(minimax(playing_board, depth - 1, false, alpha, beta));
-                
-                // undo previous move
-                board::set_square_at(playing_board, temp_move.0, temp_move.1, board::EMPTY);
-
-                // alpha-beta pruning
-                alpha = alpha.max(best_eval);
-                if beta <= alpha { break; }
-            }
-        }
-        
-        return best_eval;
-    }
-    else {
-        let mut best_eval: i8 = i8::MAX;
-
-        for col in 0..board::BOARD_WIDTH {
-            if board::is_column_open_num(playing_board, col) {
-                // perform move
-                let temp_move: (usize, usize) = board::drop_at_column_num(playing_board, col, board::RED_PIECE);
-
-                // evaluate move
-                best_eval = best_eval.min(minimax(playing_board, depth - 1, true, alpha, beta));
-
-                // undo previous move
-                board::set_square_at(playing_board, temp_move.0, temp_move.1, board::EMPTY);
-
-                // alpha-beta pruning
-                beta = beta.min(best_eval);
-                if beta <= alpha { break; }
-            }
-        }
-
-        return best_eval;
-    }
+fn is_terminal_node(playing_board: &[char; board::BOARD_SIZE]) -> (bool, bool, bool) {
+    return (board::evaluate_board(playing_board, board::RED_PIECE) >= 950, 
+            board::evaluate_board(playing_board, board::YELLOW_PIECE) >= 950, 
+            board::get_open_columns(playing_board).len() == 0);
 }
